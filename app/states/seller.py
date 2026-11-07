@@ -1,0 +1,26 @@
+from aiogram.fsm.state import State, StatesGroup
+
+
+class SellerStates(StatesGroup):
+    choosing_platform = State()
+    nickname = State()
+    screenshots = State()
+    description = State()
+    login = State()
+    password = State()
+    price = State()
+    additional_info = State()
+    extra_fields_menu = State()
+    field_label = State()
+    field_value = State()
+    preview = State()
+    edit_menu = State()
+    edit_value = State()
+    warning = State()
+    my_accounts = State()
+    account_edit_menu = State()
+    account_edit_value = State()
+    account_field_label = State()
+    account_field_value = State()
+    account_images = State()
+    account_delete_confirm = State()
