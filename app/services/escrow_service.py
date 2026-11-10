@@ -5,9 +5,11 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.constants import quantize_money
 from app.models import Order, OrderStatus, Transaction, TransactionType
 from app.services import account_service, release_service
+from app.services.commission_service import split_payment_amount
 from app.services.order_service import (
     OrderError,
     OrderForbidden,
@@ -28,6 +30,12 @@ async def hold_funds(session: AsyncSession, order_id: int) -> Order:
     if order.status != OrderStatus.PENDING_PAYMENT.value:
         raise OrderStateError("Buyurtma to'lov uchun mos holatda emas.")
 
+    settings = get_settings()
+    commission, seller_amount = split_payment_amount(
+        Decimal(order.amount), settings.platform_commission_rate
+    )
+    order.commission_amount = commission
+    order.seller_amount = seller_amount
     order.status = OrderStatus.PAID.value
     order.paid_at = now_utc()
 
@@ -35,7 +43,7 @@ async def hold_funds(session: AsyncSession, order_id: int) -> Order:
     buyer_balance = await get_buyer_balance(session, order.buyer_id)
 
     seller_balance.pending = quantize_money(
-        Decimal(seller_balance.pending) + Decimal(order.seller_amount)
+        Decimal(seller_balance.pending) + seller_amount
     )
     buyer_balance.held = quantize_money(Decimal(buyer_balance.held) + Decimal(order.amount))
 
@@ -54,7 +62,7 @@ async def hold_funds(session: AsyncSession, order_id: int) -> Order:
             order_id=order.id,
             user_id=order.seller_id,
             type=TransactionType.ESCROW_HOLD.value,
-            amount=order.seller_amount,
+            amount=seller_amount,
             balance_after=seller_balance.pending,
             reference=f"escrow:{order.id}",
             description="Seller share held in escrow",
@@ -64,7 +72,7 @@ async def hold_funds(session: AsyncSession, order_id: int) -> Order:
         Transaction(
             order_id=order.id,
             type=TransactionType.PLATFORM_COMMISSION.value,
-            amount=order.commission_amount,
+            amount=commission,
             reference=f"commission:{order.id}",
             description="Platform commission",
         )

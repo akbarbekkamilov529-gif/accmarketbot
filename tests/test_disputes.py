@@ -42,7 +42,7 @@ async def test_dispute_stops_and_resumes_hourly_release(
     released_after = await release_service.process_order_releases(
         session, order.id, reference_time=two_hours
     )
-    assert released_after == Decimal("9500.00")
+    assert released_after == Decimal("9300.00")
 
 
 async def test_only_participants_can_send_dispute_messages(

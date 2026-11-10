@@ -50,7 +50,7 @@ async def test_payment_mark_succeeded_is_idempotent(
         select(SellerBalance).where(SellerBalance.seller_id == seller.id)
     )
     assert seller_balance is not None
-    assert seller_balance.pending == Decimal("95000.00")
+    assert seller_balance.pending == Decimal("93000.00")
 
     payment_tx_count = await session.scalar(
         select(func.count(Transaction.id)).where(
@@ -58,6 +58,22 @@ async def test_payment_mark_succeeded_is_idempotent(
         )
     )
     assert payment_tx_count == 1
+
+    commission_tx_count = await session.scalar(
+        select(func.count(Transaction.id)).where(
+            Transaction.order_id == order.id,
+            Transaction.type == "platform_commission",
+        )
+    )
+    assert commission_tx_count == 1
+    commission_tx = await session.scalar(
+        select(Transaction).where(
+            Transaction.order_id == order.id,
+            Transaction.type == "platform_commission",
+        )
+    )
+    assert commission_tx is not None
+    assert commission_tx.amount == Decimal("7000.00")
 
     with pytest.raises(PaymentError):
         await service.mark_failed(session, payment.id)

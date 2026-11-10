@@ -41,8 +41,15 @@ async def test_order_reservation_and_commission(session, seller, buyer, account)
     assert account.status == AccountStatus.RESERVED.value
     assert order.status == OrderStatus.PENDING_PAYMENT.value
     assert order.amount == Decimal("100000.00")
-    assert order.commission_amount == Decimal("5000.00")
-    assert order.seller_amount == Decimal("95000.00")
+    assert order.commission_amount == Decimal("7000.00")
+    assert order.seller_amount == Decimal("93000.00")
+    commission_tx_count = await session.scalar(
+        select(func.count(Transaction.id)).where(
+            Transaction.order_id == order.id,
+            Transaction.type == "platform_commission",
+        )
+    )
+    assert commission_tx_count == 0
 
     with pytest.raises(AccountNotAvailable):
         await order_service.create_order(session, buyer, account.id)
@@ -59,7 +66,7 @@ async def test_hourly_release_is_idempotent_and_capped(
     released = await release_service.process_order_releases(
         session, order.id, reference_time=one_hour_later
     )
-    assert released == Decimal("4750.00")
+    assert released == Decimal("4650.00")
 
     released_again = await release_service.process_order_releases(
         session, order.id, reference_time=one_hour_later
@@ -75,8 +82,8 @@ async def test_hourly_release_is_idempotent_and_capped(
         select(SellerBalance).where(SellerBalance.seller_id == seller.id)
     )
     assert seller_balance is not None
-    assert seller_balance.available == Decimal("4750.00")
-    assert seller_balance.pending == Decimal("90250.00")
+    assert seller_balance.available == Decimal("4650.00")
+    assert seller_balance.pending == Decimal("88350.00")
 
 
 async def test_completion_releases_remaining_and_marks_sold(
@@ -100,9 +107,9 @@ async def test_completion_releases_remaining_and_marks_sold(
         select(SellerBalance).where(SellerBalance.seller_id == seller.id)
     )
     assert seller_balance is not None
-    assert seller_balance.total_released == Decimal("95000.00")
+    assert seller_balance.total_released == Decimal("93000.00")
     assert seller_balance.pending == Decimal("0.00")
-    assert seller_balance.available == Decimal("95000.00")
+    assert seller_balance.available == Decimal("93000.00")
 
     completion_tx = await session.scalar(
         select(Transaction).where(
@@ -111,7 +118,7 @@ async def test_completion_releases_remaining_and_marks_sold(
         )
     )
     assert completion_tx is not None
-    assert completion_tx.amount == Decimal("90250.00")
+    assert completion_tx.amount == Decimal("88350.00")
 
 
 async def test_release_never_exceeds_seller_amount(session, seller, buyer, account) -> None:
@@ -124,7 +131,7 @@ async def test_release_never_exceeds_seller_amount(session, seller, buyer, accou
         session, order.id, reference_time=much_later
     )
     total = await release_service.hourly_released_total(session, order.id)
-    assert total == Decimal("95000.00")
+    assert total == Decimal("93000.00")
 
     count = await session.scalar(
         select(func.count(HourlyRelease.id)).where(HourlyRelease.order_id == order.id)

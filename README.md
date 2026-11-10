@@ -105,7 +105,7 @@ Testlar SQLite in-memory bazada ishlaydi, lokal PostgreSQL talab qilmaydi.
 | `WEBHOOK_SECRET` | Telegram webhook secret token; faqat `A-Z a-z 0-9 _ -` belgilari |
 | `HOST` / `PORT` | HTTP server manzili; Render'da `PORT` avtomatik beriladi |
 | `POLLING_FORCE` | Lokal polling mavjud webhook'ni almashtirishiga ruxsat beradi; odatda `false` |
-| `PLATFORM_COMMISSION_RATE` | Platforma komissiyasi, default `5` (%) |
+| `PLATFORM_COMMISSION_RATE` | Platforma komissiyasi, default `7` (%) |
 | `HOURLY_RELEASE_RATE` | Soatlik chiqarish ulushi, default `5` (%) |
 | `PAYMENTS_ENABLED` | Haqiqiy to'lovlar yoqilganini bildiradi, default `false` |
 | `PAYMENT_PROVIDER` | `skip`, `click` yoki `payme` |
@@ -156,6 +156,7 @@ Docker Render'da `PORT` avtomatik beriladi. Konteyner `alembic upgrade head`dan 
 - Order yaratilganda akkaunt atomik `RESERVED` bo'ladi; partial unique index bir akkauntni ikki marta sotishni bloklaydi.
 - Komissiya: `order.amount * PLATFORM_COMMISSION_RATE / 100`.
 - Seller ulushi: `order.amount - commission`.
+- Komissiya yakuniy summasi faqat muvaffaqiyatli to'lovdan keyin hisoblanadi va bitta tranzaksiya sifatida yoziladi; `orders.amount`, `orders.commission_amount`, `orders.seller_amount` alohida saqlanadi.
 - Hourly release: seller ulushining `HOURLY_RELEASE_RATE` foizi, `HOURLY_RELEASE_INTERVAL_SECONDS` oralig'ida. `(order_id, hour_number)` unique bo'lgani uchun idempotent.
 - Nizo ochilganda hourly release to'xtaydi. Nizoni avtomatik hal qilish yoki refund qilish yo'q — kelishuv yoki qo'lda aralashuv talab qilinadi.
 - Buyer tasdiqlaganda qolgan escrow qismi sellerga chiqariladi.
