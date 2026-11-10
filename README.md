@@ -51,7 +51,7 @@ python -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env
 ```
 
-`.env` faylini to'ldiring:
+`.env` faylini to'ldiring. `.env.example` ichida real token ataylab yozilmagan — `BOT_TOKEN` qatorini qo'lda qo'shing:
 
 ```dotenv
 BOT_TOKEN=123456:telegram-bot-token
@@ -60,6 +60,8 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/marketplace
 ENVIRONMENT=development
 USE_WEBHOOK=false
 ```
+
+Lokal polling ishga tushganda HTTP server ham `http://127.0.0.1:8080/health`da ochiladi. Agar Telegram'da webhook allaqachon o'rnatilgan bo'lsa (masalan Render servisi ishlayotgan bo'lsa), lokal polling o'zini to'xtatadi va webhook'ni o'chirmaydi. Ataylab almashtirmoqchi bo'lsangizgina `POLLING_FORCE=true` qiling.
 
 Shifrlash kalitini yarating:
 
@@ -98,9 +100,11 @@ Testlar SQLite in-memory bazada ishlaydi, lokal PostgreSQL talab qilmaydi.
 | `CREDENTIAL_ENCRYPTION_KEY` | AES-GCM kaliti (majburiy, productionda) |
 | `DATABASE_URL` | PostgreSQL URL; `postgresql://` avtomatik asyncpg'ga o'giriladi |
 | `ENVIRONMENT` | `development`, `production`, `test` |
-| `USE_WEBHOOK` | `true` bo'lsa webhook, `false` bo'lsa polling |
+| `USE_WEBHOOK` | `true` bo'lsa webhook, `false` bo'lsa polling. Render'da avtomatik `true` |
 | `WEBHOOK_BASE_URL` | Webhook uchun tashqi URL; Render'da `RENDER_EXTERNAL_URL` avtomatik ishlatiladi |
-| `WEBHOOK_SECRET` | Telegram webhook secret token |
+| `WEBHOOK_SECRET` | Telegram webhook secret token; faqat `A-Z a-z 0-9 _ -` belgilari |
+| `HOST` / `PORT` | HTTP server manzili; Render'da `PORT` avtomatik beriladi |
+| `POLLING_FORCE` | Lokal polling mavjud webhook'ni almashtirishiga ruxsat beradi; odatda `false` |
 | `PLATFORM_COMMISSION_RATE` | Platforma komissiyasi, default `5` (%) |
 | `HOURLY_RELEASE_RATE` | Soatlik chiqarish ulushi, default `5` (%) |
 | `PAYMENTS_ENABLED` | Haqiqiy to'lovlar yoqilganini bildiradi, default `false` |
@@ -117,7 +121,23 @@ To'liq ro'yxat `.env.example` faylida.
 4. Deploy tugagach, servis URL'i `https://<service>.onrender.com` bo'ladi. `RENDER_EXTERNAL_URL` orqali webhook avtomatik sozlanadi.
 5. Health check: `/health`.
 
-Render start command `alembic upgrade head && python main.py` bo'lgani uchun migratsiyalar har deployda qo'llanadi. **Bitta instance** ishlatilsin: scheduler va hourly release takrorlanmasligi kerak.
+Render muhitida bot **har doim webhook rejimida** ishlaydi (`RENDER` / `RENDER_EXTERNAL_URL` avtomatik aniqlanadi). HTTP server `0.0.0.0:${PORT}` manzilida ochiladi, shuning uchun `No open ports detected` xatosi chiqmaydi. Polling va webhook bir vaqtda ishlamaydi: webhook o'rnatilganda Telegram eski `getUpdates` sessiyasini avtomatik to'xtatadi.
+
+Render start command `python -m alembic upgrade head && python main.py` bo'lgani uchun migratsiyalar har deployda qo'llanadi. **Bitta instance** ishlatilsin: scheduler va hourly release takrorlanmasligi kerak. Lokal kompyuterda ham xuddi shu `BOT_TOKEN` bilan polling ishga tushirmang — `TelegramConflictError: terminated by other getUpdates request` shu sababdan chiqadi.
+
+Majburiy Render Environment Variables:
+
+| O'zgaruvchi | Qiymat |
+| --- | --- |
+| `BOT_TOKEN` | BotFather'dan olingan token |
+| `CREDENTIAL_ENCRYPTION_KEY` | 32-byte base64 kalit |
+| `DATABASE_URL` | Render PostgreSQL `connectionString` |
+| `ENVIRONMENT` | `production` |
+| `USE_WEBHOOK` | `true` |
+| `WEBHOOK_SECRET` | Render `generateValue` yoki o'zingizning xavfsiz token |
+| `AUTO_CREATE_TABLES` | `false` |
+
+`PORT` va `RENDER_EXTERNAL_URL` Render tomonidan avtomatik beriladi; qo'lda kiritish shart emas.
 
 > Free plan'dagi web service vaqti-vaqti bilan uxlab qoladi, free PostgreSQL esa muddatli bo'ladi. Haqiqiy savdo uchun paid plan va muntazam backup tavsiya etiladi.
 
@@ -125,8 +145,10 @@ Render start command `alembic upgrade head && python main.py` bo'lgani uchun mig
 
 ```powershell
 docker build -t tg-marketplace-bot .
-docker run --env-file .env -p 8080:8080 tg-marketplace-bot
+docker run --env-file .env -e PORT=8080 -p 8080:8080 tg-marketplace-bot
 ```
+
+Docker Render'da `PORT` avtomatik beriladi. Konteyner `alembic upgrade head`dan keyin `python main.py` ishga tushiradi va `0.0.0.0:${PORT}`da tinglaydi.
 
 ## Biznes qoidalari
 
@@ -151,6 +173,7 @@ docker run --env-file .env -p 8080:8080 tg-marketplace-bot
 ## Xavfsizlik
 
 - `.env` hech qachon repoga commit qilinmasin.
+- Agar `BOT_TOKEN` biror fayl yoki git tarixiga tushib qolgan bo'lsa, BotFather'da `/revoke` qilib tokenni yangilang va Render + lokal `.env`dagi qiymatni almashtiring.
 - `CREDENTIAL_ENCRYPTION_KEY`ni almashtirsangiz, mavjud shifrlangan ma'lumotlar o'qilmaydi. Kalitni xavfsiz saqlang va backup qiling.
 - Bot tokeni va webhook secretni faqat Render Environment Variables'da saqlang.
 - Ishlab chiqarishda PostgreSQL backup va monitoring yoqilsin.

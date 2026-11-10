@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import re
 from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
@@ -45,7 +47,14 @@ class Settings(BaseSettings):
     webhook_base_url: str = ""
     webhook_path: str = "/webhook"
     webhook_drop_pending: bool = False
+    # Allow local polling to replace an existing (for example Render) webhook.
+    polling_force: bool = False
+
+    # Render injects these variables automatically for Web Services.
+    render: str = ""
+    render_service_id: str = ""
     render_external_url: str = ""
+    render_external_hostname: str = ""
 
     # Optional Redis (FSM storage / distributed rate limits)
     redis_url: str | None = None
@@ -101,11 +110,40 @@ class Settings(BaseSettings):
             (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
         )
 
+    @field_validator("host")
+    @classmethod
+    def normalize_host(cls, value: str) -> str:
+        return (value or "").strip() or "0.0.0.0"
+
+    @field_validator("port", mode="before")
+    @classmethod
+    def normalize_port(cls, value: object) -> int:
+        if value in (None, ""):
+            return 8080
+        try:
+            port = int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return 8080
+        return port if 0 < port < 65536 else 8080
+
     @field_validator("webhook_path")
     @classmethod
     def normalize_webhook_path(cls, value: str) -> str:
         value = value.strip() or "/webhook"
-        return value if value.startswith("/") else "/" + value
+        if not value.startswith("/"):
+            value = "/" + value
+        if value in {"/", "/health", "/healthz"}:
+            value = "/webhook"
+        return value
+
+    @field_validator("webhook_secret")
+    @classmethod
+    def sanitize_webhook_secret(cls, value: str) -> str:
+        # Telegram only accepts A-Z, a-z, 0-9, "_" and "-" in secret_token.
+        # Generated values (for example Render's generateValue) may contain
+        # other characters, so strip them instead of failing at setWebhook.
+        cleaned = re.sub(r"[^A-Za-z0-9_-]", "", (value or "").strip())
+        return cleaned[:256]
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":
@@ -117,19 +155,41 @@ class Settings(BaseSettings):
                 missing.append("CREDENTIAL_ENCRYPTION_KEY")
             if not self.database_url:
                 missing.append("DATABASE_URL")
-            if self.use_webhook and not self.effective_webhook_base_url:
-                missing.append("WEBHOOK_BASE_URL")
             if missing:
-                raise ValueError("Missing required production environment variables: " + ", ".join(missing))
-        if self.use_webhook and not self.effective_webhook_base_url:
-            raise ValueError(
-                "WEBHOOK_BASE_URL (or RENDER_EXTERNAL_URL) is required when USE_WEBHOOK=true"
-            )
+                raise ValueError(
+                    "Missing required production environment variables: "
+                    + ", ".join(missing)
+                )
         return self
 
     @property
+    def is_render(self) -> bool:
+        return bool(
+            self.render
+            or self.render_service_id
+            or self.render_external_url
+            or self.render_external_hostname
+            or os.environ.get("RENDER")
+            or os.environ.get("RENDER_SERVICE_ID")
+        )
+
+    @property
+    def webhook_enabled(self) -> bool:
+        # On Render we always use webhooks. Long polling cannot satisfy
+        # Render's port scan and causes getUpdates conflicts between instances.
+        return self.use_webhook or self.is_render
+
+    @property
     def effective_webhook_base_url(self) -> str:
-        return (self.webhook_base_url or self.render_external_url).strip().rstrip("/")
+        base = (self.webhook_base_url or self.render_external_url).strip()
+        if not base:
+            host = (
+                self.render_external_hostname
+                or os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+            ).strip()
+            if host:
+                base = host if host.startswith("http") else f"https://{host}"
+        return base.rstrip("/")
 
     @property
     def webhook_url(self) -> str:

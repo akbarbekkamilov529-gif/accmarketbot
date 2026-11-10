@@ -32,3 +32,33 @@ def test_ssl_boolean_query_is_mapped_to_asyncpg_value() -> None:
 def test_sqlite_url_is_left_unchanged() -> None:
     url = "sqlite+aiosqlite:///./local.db"
     assert _settings(url).database_url == url
+
+
+def test_render_environment_enables_webhook() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="test",
+        render_external_url="https://demo.onrender.com",
+    )
+    assert settings.is_render is True
+    assert settings.webhook_enabled is True
+    assert settings.webhook_url == "https://demo.onrender.com/webhook"
+
+
+def test_webhook_secret_is_sanitized_for_telegram() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="test",
+        webhook_secret="ab+c/1=_x",
+    )
+    assert settings.webhook_secret == "abc1_x"
+
+
+def test_webhook_path_cannot_shadow_health_endpoint() -> None:
+    settings = Settings(_env_file=None, environment="test", webhook_path="/health")
+    assert settings.webhook_path == "/webhook"
+
+
+def test_empty_port_falls_back_to_default() -> None:
+    settings = Settings(_env_file=None, environment="test", port="")
+    assert settings.port == 8080
