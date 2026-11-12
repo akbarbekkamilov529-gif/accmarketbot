@@ -24,6 +24,14 @@ def main_menu_kb(locale: str | None = None) -> ReplyKeyboardMarkup:
     )
 
 
+def language_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for code in SUPPORTED_LOCALES:
+        builder.button(text=LOCALE_LABELS[code], callback_data=f"lang:set:{code}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def main_menu_inline_kb(locale: str | None = None) -> InlineKeyboardMarkup:
     locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()

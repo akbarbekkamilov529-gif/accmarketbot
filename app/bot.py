@@ -12,7 +12,12 @@ from app.crypto import get_cipher
 from app.database import dispose_engine, engine
 from app.handlers import common, disputes, fallback, orders, profile, reviews, seller, buyer
 from app.logging_config import get_logger, setup_logging
-from app.middlewares import DatabaseMiddleware, RateLimitMiddleware, UserMiddleware
+from app.middlewares import (
+    DatabaseMiddleware,
+    LanguageGateMiddleware,
+    RateLimitMiddleware,
+    UserMiddleware,
+)
 from app.models import Base
 from app.scheduler import start_scheduler, stop_scheduler
 
@@ -54,9 +59,10 @@ def register_routers(dp: Dispatcher) -> None:
 
 def register_middlewares(dp: Dispatcher, settings: Settings) -> None:
     for observer in (dp.message, dp.callback_query):
-        observer.middleware(RateLimitMiddleware(settings.rate_limit_per_minute))
         observer.middleware(DatabaseMiddleware())
         observer.middleware(UserMiddleware())
+        observer.middleware(RateLimitMiddleware(settings.rate_limit_per_minute))
+        observer.middleware(LanguageGateMiddleware())
 
 
 def register_lifecycle(dp: Dispatcher, settings: Settings) -> None:

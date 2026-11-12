@@ -13,6 +13,7 @@ from app.handlers.helpers import safe_edit
 from app.i18n import (
     LOCALE_LABELS,
     SUPPORTED_LOCALES,
+    language_selected,
     menu_action_by_text,
     status_label,
     t,
@@ -20,7 +21,7 @@ from app.i18n import (
     user_locale,
 )
 from app.keyboards.buyer import buyer_platforms_kb
-from app.keyboards.common import main_menu_kb, settings_kb
+from app.keyboards.common import language_kb, main_menu_kb, settings_kb
 from app.keyboards.orders import orders_root_kb
 from app.keyboards.seller import seller_accounts_menu_kb, seller_platforms_kb
 from app.models import Order, Transaction, User
@@ -391,6 +392,9 @@ async def cmd_start(
     message: Message, state: FSMContext, session: AsyncSession, user: User
 ) -> None:
     await state.clear()
+    if not language_selected(user):
+        await message.answer(t("language.title"), reply_markup=language_kb())
+        return
     await send_profile(message, session, user, user_locale(user))
 
 
@@ -532,7 +536,7 @@ async def bought_callback(
     )
 
 
-@router.callback_query(F.data.startswith("settings:lang:"))
+@router.callback_query(F.data.startswith("lang:set:") | F.data.startswith("settings:lang:"))
 async def settings_language(
     callback: CallbackQuery, session: AsyncSession, user: User
 ) -> None:

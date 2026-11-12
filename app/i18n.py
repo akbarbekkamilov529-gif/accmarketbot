@@ -21,6 +21,10 @@ MENU_KEYS: tuple[str, ...] = (
     "stats",
     "settings",
     "help",
+    "orders",
+    "sold",
+    "bought",
+    "home",
 )
 
 _CURRENT_LOCALE: ContextVar[str] = ContextVar("current_locale", default=DEFAULT_LOCALE)

@@ -10,6 +10,7 @@ from app.keyboards.buyer import (
 from app.keyboards.common import (
     back_home_kb,
     cancel_kb,
+    language_kb,
     main_menu_inline_kb,
     main_menu_kb,
     settings_kb,
@@ -42,6 +43,7 @@ __all__ = [
     "dispute_message_cancel_kb",
     "edit_menu_kb",
     "extra_fields_menu_kb",
+    "language_kb",
     "main_menu_inline_kb",
     "main_menu_kb",
     "order_actions_kb",
