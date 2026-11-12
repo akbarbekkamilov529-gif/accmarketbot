@@ -11,6 +11,7 @@ from app.constants import (
     format_money,
     platform_display,
 )
+from app.i18n import normalize_locale, t
 from app.models import Account
 from app.utils import esc
 
@@ -21,15 +22,16 @@ def _truncate_button(text: str, limit: int = MAX_BUTTON_LABEL) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def buyer_platforms_kb() -> InlineKeyboardMarkup:
+def buyer_platforms_kb(locale: str | None = None) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()
     for platform in ALL_PLATFORMS:
         builder.button(
             text=f"{platform.emoji} {platform.name}",
             callback_data=f"buyer:platform:{platform.key}",
         )
-    builder.button(text="📦 Buyurtmalarim", callback_data="orders:list")
-    builder.button(text="🏠 Bosh menyu", callback_data="menu:home")
+    builder.button(text=t("menu.orders", locale), callback_data="orders:list")
+    builder.button(text=t("common.home", locale), callback_data="menu:home")
     total = len(ALL_PLATFORMS)
     builder.adjust(*([2] * ((total + 1) // 2)), 1, 1)
     return builder.as_markup()

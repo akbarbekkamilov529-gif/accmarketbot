@@ -3,6 +3,7 @@ from __future__ import annotations
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.i18n import normalize_locale, t
 from app.models import Order, OrderStatus
 
 
@@ -31,11 +32,12 @@ def order_actions_kb(order: Order, *, for_seller: bool) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def orders_root_kb() -> InlineKeyboardMarkup:
+def orders_root_kb(locale: str | None = None) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()
-    builder.button(text="🛍 Xaridlarim", callback_data="orders:mine:buyer:0")
-    builder.button(text="💰 Sotuvlarim", callback_data="orders:mine:seller:0")
-    builder.button(text="🏠 Bosh menyu", callback_data="menu:home")
+    builder.button(text=t("orders.buyer", locale), callback_data="orders:mine:buyer:0")
+    builder.button(text=t("orders.seller", locale), callback_data="orders:mine:seller:0")
+    builder.button(text=t("common.home", locale), callback_data="menu:home")
     builder.adjust(1)
     return builder.as_markup()
 

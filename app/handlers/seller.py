@@ -24,7 +24,8 @@ from app.handlers.helpers import (
     send_media_group_safe,
     send_photo_or_text,
 )
-from app.keyboards import main_menu_kb
+from app.i18n import t, user_locale
+from app.keyboards import main_menu_inline_kb
 from app.keyboards.common import cancel_kb
 from app.logging_config import get_logger
 from app.keyboards.seller import (
@@ -200,23 +201,26 @@ async def seller_menu(
     await mark_seller(session, user)
     await state.clear()
     await state.set_state(SellerStates.choosing_platform)
-    text = (
-        "💰 <b>Seller bo'limi</b>\n\n"
-        "Akkaunt joylash uchun platformani tanlang.\n\n"
-        "🎮 <b>O'yinlar</b> va 🌐 <b>ijtimoiy tarmoqlar</b> ro'yxati quyida."
+    locale = user_locale(user)
+    await safe_edit(
+        callback.message,
+        t("section.seller", locale),
+        seller_platforms_kb(locale),
     )
-    await safe_edit(callback.message, text, seller_platforms_kb())
 
 
 @router.callback_query(F.data == "seller:new")
-async def seller_new(callback: CallbackQuery, state: FSMContext) -> None:
+async def seller_new(
+    callback: CallbackQuery, state: FSMContext, user: User
+) -> None:
     await callback.answer()
     await state.clear()
     await state.set_state(SellerStates.choosing_platform)
+    locale = user_locale(user)
     await safe_edit(
         callback.message,
-        "💰 Qaysi platforma uchun akkaunt joylamoqchisiz?",
-        seller_platforms_kb(),
+        t("section.seller", locale),
+        seller_platforms_kb(locale),
     )
 
 
@@ -566,9 +570,9 @@ async def seller_preview_cancel(
     await state.clear()
     text = "❌ E'lon joylash bekor qilindi.\n\nBosh menyu:"
     try:
-        await callback.message.edit_text(text, reply_markup=main_menu_kb())
+        await callback.message.edit_text(text, reply_markup=main_menu_inline_kb())
     except Exception:  # noqa: BLE001
-        await callback.message.answer(text, reply_markup=main_menu_kb())
+        await callback.message.answer(text, reply_markup=main_menu_inline_kb())
 
 
 @router.callback_query(StateFilter(SellerStates.edit_menu), F.data.startswith("seller:editf:"))
@@ -786,14 +790,17 @@ async def seller_warning_yes(
 
 
 @router.callback_query(F.data == "seller:myaccounts")
-async def seller_myaccounts(callback: CallbackQuery, state: FSMContext) -> None:
+async def seller_myaccounts(
+    callback: CallbackQuery, state: FSMContext, user: User
+) -> None:
     await callback.answer()
     await state.clear()
     await state.set_state(SellerStates.my_accounts)
+    locale = user_locale(user)
     await safe_edit(
         callback.message,
-        "📚 <b>Mening akkauntlarim</b>\n\nBo'limni tanlang:",
-        seller_accounts_menu_kb(),
+        t("listings.title", locale),
+        seller_accounts_menu_kb(locale),
     )
 
 
@@ -821,16 +828,28 @@ async def seller_list(callback: CallbackQuery, state: FSMContext, session: Async
     )
     has_next = offset + len(accounts) < total
 
+    locale = user_locale(user)
     titles = {
-        "active": "🟢 Sotuvdagi akkauntlar",
-        "sold": "✅ Sotilgan akkauntlar",
-        "all": "📚 Barcha e'lonlar",
+        "active": t("listings.active", locale),
+        "pending": t("listings.pending", locale),
+        "sold": t("listings.sold", locale),
+        "all": t("listings.all", locale),
     }
     title = titles[flt]
+    total_pages = max(1, (total + settings.page_size - 1) // settings.page_size)
     if total == 0:
-        text = f"{title}\n\n📭 Hozircha akkaunt yo'q."
+        text = f"{title}\n\n{t('listings.empty', locale)}"
     else:
-        text = f"{title}\n\nJami: <b>{total}</b> ta\nSahifa: <b>{page + 1}</b>\n\nE'lonni tanlang:"
+        text = (
+            f"{title}\n\n"
+            + t(
+                "list.page",
+                locale,
+                total=total,
+                page=page + 1,
+                total_pages=total_pages,
+            )
+        )
     await safe_edit(
         callback.message,
         text,

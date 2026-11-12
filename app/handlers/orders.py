@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.constants import format_money, platform_display
 from app.handlers.helpers import safe_edit
+from app.i18n import t, user_locale
 from app.keyboards.buyer import review_rating_kb
 from app.keyboards.orders import order_actions_kb, orders_root_kb
 from app.models import Order, OrderStatus, User
@@ -92,13 +93,16 @@ async def _refresh_order_view(
 
 
 @router.callback_query(F.data == "orders:list")
-async def orders_root(callback: CallbackQuery, state: FSMContext) -> None:
+async def orders_root(
+    callback: CallbackQuery, state: FSMContext, user: User
+) -> None:
     await callback.answer()
     await state.clear()
+    locale = user_locale(user)
     await safe_edit(
         callback.message,
-        "📦 <b>Buyurtmalarim</b>\n\nXaridlar yoki sotuvlar bo'limini tanlang:",
-        orders_root_kb(),
+        t("section.orders", locale),
+        orders_root_kb(locale),
     )
 
 

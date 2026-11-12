@@ -4,6 +4,9 @@ Telegram uchun to'liq avtomatlashtirilgan account marketplace boti. **Admin pane
 
 ## Imkoniyatlar
 
+- Doimiy reply menyu: profil, balans, sotib olish, sotish, buyurtmalar, e'lonlar, tarix, statistika va sozlamalar.
+- `/start` profil sahifasini ochadi: ism, username, Telegram ID, balans, savdo statistikasi, reyting va ro'yxatdan o'tgan sana.
+- Uch tilli interfeys: o'zbek, rus va ingliz; tanlangan til bazada saqlanadi.
 - Seller akkaunt qo'shadi: platforma, nickname, skrinshotlar, tavsif, login/parol, qo'shimcha maydonlar, narx.
 - E'lon yaratishdan oldin preview, tahrirlash va ogohlantirish ekrani.
 - Buyer platforma bo'yicha qidirish, filtrlash, sahifalash, akkaunt kartasi va batafsil ko'rinish.
@@ -29,8 +32,8 @@ Telegram uchun to'liq avtomatlashtirilgan account marketplace boti. **Admin pane
 ```text
 app/
   bot.py, config.py, constants.py, crypto.py, database.py
-  handlers/     # common, seller, buyer, orders, disputes, reviews
-  keyboards/    # inline klaviaturalar
+  handlers/     # common, profile, seller, buyer, orders, disputes, reviews
+  keyboards/    # reply va inline klaviaturalar
   middlewares/  # database, user, rate limit
   models/       # SQLAlchemy modellari
   services/     # account, order, escrow, release, payment, dispute, review

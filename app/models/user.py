@@ -23,6 +23,7 @@ class User(Base, TimestampMixin):
     first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     language_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    preferred_language: Mapped[str | None] = mapped_column(String(8), nullable=True)
     is_seller: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 

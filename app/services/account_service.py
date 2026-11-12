@@ -175,7 +175,9 @@ async def list_active_accounts(
 async def count_seller_accounts(session: AsyncSession, seller_id: int, flt: str) -> int:
     stmt = select(func.count(Account.id)).where(Account.seller_id == seller_id)
     if flt == "active":
-        stmt = stmt.where(Account.status.in_([AccountStatus.ACTIVE.value, AccountStatus.RESERVED.value]))
+        stmt = stmt.where(Account.status == AccountStatus.ACTIVE.value)
+    elif flt == "pending":
+        stmt = stmt.where(Account.status == AccountStatus.RESERVED.value)
     elif flt == "sold":
         stmt = stmt.where(Account.status == AccountStatus.SOLD.value)
     else:
@@ -193,7 +195,9 @@ async def list_seller_accounts(
 ) -> list[Account]:
     stmt = account_query().where(Account.seller_id == seller_id)
     if flt == "active":
-        stmt = stmt.where(Account.status.in_([AccountStatus.ACTIVE.value, AccountStatus.RESERVED.value]))
+        stmt = stmt.where(Account.status == AccountStatus.ACTIVE.value)
+    elif flt == "pending":
+        stmt = stmt.where(Account.status == AccountStatus.RESERVED.value)
     elif flt == "sold":
         stmt = stmt.where(Account.status == AccountStatus.SOLD.value)
     else:

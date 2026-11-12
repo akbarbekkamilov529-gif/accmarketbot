@@ -7,7 +7,13 @@ from app.keyboards.buyer import (
     review_comment_kb,
     review_rating_kb,
 )
-from app.keyboards.common import back_home_kb, cancel_kb, main_menu_kb
+from app.keyboards.common import (
+    back_home_kb,
+    cancel_kb,
+    main_menu_inline_kb,
+    main_menu_kb,
+    settings_kb,
+)
 from app.keyboards.dispute import dispute_kb, dispute_message_cancel_kb
 from app.keyboards.orders import order_actions_kb, orders_page_kb, orders_root_kb
 from app.keyboards.seller import (
@@ -36,6 +42,7 @@ __all__ = [
     "dispute_message_cancel_kb",
     "edit_menu_kb",
     "extra_fields_menu_kb",
+    "main_menu_inline_kb",
     "main_menu_kb",
     "order_actions_kb",
     "orders_page_kb",
@@ -52,5 +59,6 @@ __all__ = [
     "seller_list_kb",
     "seller_platforms_kb",
     "screenshots_kb",
+    "settings_kb",
     "warning_kb",
 ]

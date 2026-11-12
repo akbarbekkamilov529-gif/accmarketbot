@@ -22,6 +22,7 @@ from app.handlers.helpers import (
     send_media_group_safe,
     send_photo_or_text,
 )
+from app.i18n import t, user_locale
 from app.keyboards.buyer import (
     buyer_list_nav_kb,
     buyer_account_detail_kb,
@@ -164,16 +165,15 @@ async def _render_list(
 
 
 @router.callback_query(F.data == "menu:buyer")
-async def buyer_menu(callback: CallbackQuery, state: FSMContext) -> None:
+async def buyer_menu(callback: CallbackQuery, state: FSMContext, user: User) -> None:
     await callback.answer()
     await state.clear()
     await state.set_state(BuyerStates.browse)
+    locale = user_locale(user)
     await safe_edit(
         callback.message,
-        "🛍 <b>Buyer bo'limi</b>\n\n"
-        "Qaysi platformadagi akkauntlar qiziqtiradi?\n"
-        "Platformani tanlang:",
-        buyer_platforms_kb(),
+        t("section.buyer", locale),
+        buyer_platforms_kb(locale),
     )
 
 

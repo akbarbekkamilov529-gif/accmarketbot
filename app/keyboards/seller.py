@@ -9,6 +9,7 @@ from app.constants import (
     format_money,
     platform_display,
 )
+from app.i18n import normalize_locale, t
 from app.models import Account, AccountStatus
 from app.utils import esc
 
@@ -19,15 +20,16 @@ def _truncate_button(text: str, limit: int = MAX_BUTTON_LABEL) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def seller_platforms_kb() -> InlineKeyboardMarkup:
+def seller_platforms_kb(locale: str | None = None) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()
     for platform in GAME_PLATFORMS + SOCIAL_PLATFORMS:
         builder.button(
             text=f"{platform.emoji} {platform.name}",
             callback_data=f"seller:platform:{platform.key}",
         )
-    builder.button(text="📚 Mening akkauntlarim", callback_data="seller:myaccounts")
-    builder.button(text="🏠 Bosh menyu", callback_data="menu:home")
+    builder.button(text=t("menu.listings", locale), callback_data="seller:myaccounts")
+    builder.button(text=t("common.home", locale), callback_data="menu:home")
     total = len(GAME_PLATFORMS) + len(SOCIAL_PLATFORMS)
     builder.adjust(*([2] * ((total + 1) // 2)), 1, 1)
     return builder.as_markup()
@@ -93,13 +95,15 @@ def warning_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def seller_accounts_menu_kb() -> InlineKeyboardMarkup:
+def seller_accounts_menu_kb(locale: str | None = None) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()
-    builder.button(text="🟢 Sotuvdagi akkauntlar", callback_data="seller:list:active:0")
-    builder.button(text="✅ Sotilgan akkauntlar", callback_data="seller:list:sold:0")
-    builder.button(text="📚 Barcha e'lonlar", callback_data="seller:list:all:0")
-    builder.button(text="➕ Yangi akkaunt joylash", callback_data="seller:new")
-    builder.button(text="🏠 Bosh menyu", callback_data="menu:home")
+    builder.button(text=t("listings.active", locale), callback_data="seller:list:active:0")
+    builder.button(text=t("listings.pending", locale), callback_data="seller:list:pending:0")
+    builder.button(text=t("listings.sold", locale), callback_data="seller:list:sold:0")
+    builder.button(text=t("listings.all", locale), callback_data="seller:list:all:0")
+    builder.button(text=t("listings.new", locale), callback_data="seller:new")
+    builder.button(text=t("common.home", locale), callback_data="menu:home")
     builder.adjust(1)
     return builder.as_markup()
 

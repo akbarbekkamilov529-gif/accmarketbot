@@ -10,7 +10,7 @@ from aiogram.types import BotCommand, CallbackQuery, ErrorEvent, Message
 from app.config import Settings
 from app.crypto import get_cipher
 from app.database import dispose_engine, engine
-from app.handlers import common, disputes, fallback, orders, reviews, seller, buyer
+from app.handlers import common, disputes, fallback, orders, profile, reviews, seller, buyer
 from app.logging_config import get_logger, setup_logging
 from app.middlewares import DatabaseMiddleware, RateLimitMiddleware, UserMiddleware
 from app.models import Base
@@ -43,6 +43,7 @@ def build_bot(settings: Settings) -> Bot:
 
 def register_routers(dp: Dispatcher) -> None:
     dp.include_router(common.router)
+    dp.include_router(profile.router)
     dp.include_router(seller.router)
     dp.include_router(buyer.router)
     dp.include_router(orders.router)

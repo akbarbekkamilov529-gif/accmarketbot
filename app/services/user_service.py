@@ -26,6 +26,7 @@ async def upsert_user(
         )
         session.add(user)
         await session.flush()
+        await session.refresh(user, attribute_names=["created_at", "updated_at"])
         return user
 
     user.username = username
