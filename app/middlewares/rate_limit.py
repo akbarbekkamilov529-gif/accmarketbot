@@ -9,6 +9,8 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
+from app.i18n import t, user_locale
+
 
 class RateLimitMiddleware(BaseMiddleware):
     """Simple in-process sliding-window rate limiter.
@@ -51,7 +53,8 @@ class RateLimitMiddleware(BaseMiddleware):
                     self._events.pop(uid, None)
 
         if limited:
-            text = "⏳ Juda ko'p so'rov yubordingiz. Bir daqiqadan so'ng qayta urinib ko'ring."
+            user = data.get("user")
+            text = t("errors.rate_limit", user_locale(user) if user is not None else None)
             try:
                 if isinstance(event, CallbackQuery):
                     await event.answer(text, show_alert=True)

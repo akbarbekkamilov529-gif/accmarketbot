@@ -6,6 +6,7 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, User as TelegramUser
 
+from app.i18n import reset_current_locale, set_current_locale, user_locale
 from app.services.user_service import upsert_user
 
 
@@ -30,4 +31,8 @@ class UserMiddleware(BaseMiddleware):
             language_code=tg_user.language_code,
         )
         data["user"] = user
-        return await handler(event, data)
+        token = set_current_locale(user_locale(user))
+        try:
+            return await handler(event, data)
+        finally:
+            reset_current_locale(token)
