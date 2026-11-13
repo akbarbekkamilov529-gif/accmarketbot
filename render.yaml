@@ -48,7 +48,7 @@ services:
       - key: AUTO_CREATE_TABLES
         value: "false"
       - key: PLATFORM_COMMISSION_RATE
-        value: "7"
+        value: "0"
       - key: HOURLY_RELEASE_RATE
         value: "5"
       - key: PAYMENTS_ENABLED

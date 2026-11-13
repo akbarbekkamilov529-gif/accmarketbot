@@ -11,6 +11,7 @@ from app.models import (
     HourlyRelease,
     Order,
     OrderStatus,
+    PlatformBalance,
     SellerBalance,
     Transaction,
 )
@@ -35,14 +36,14 @@ async def test_credentials_are_encrypted_at_rest(session, account) -> None:
     assert ("Recovery email", "recovery@example.com") in fields
 
 
-async def test_order_reservation_and_commission(session, seller, buyer, account) -> None:
+async def test_order_reservation_uses_full_amount(session, seller, buyer, account) -> None:
     order = await order_service.create_order(session, buyer, account.id)
     await session.refresh(account)
     assert account.status == AccountStatus.RESERVED.value
     assert order.status == OrderStatus.PENDING_PAYMENT.value
     assert order.amount == Decimal("100000.00")
-    assert order.commission_amount == Decimal("7000.00")
-    assert order.seller_amount == Decimal("93000.00")
+    assert order.commission_amount == Decimal("0.00")
+    assert order.seller_amount == Decimal("100000.00")
     commission_tx_count = await session.scalar(
         select(func.count(Transaction.id)).where(
             Transaction.order_id == order.id,
@@ -66,7 +67,7 @@ async def test_hourly_release_is_idempotent_and_capped(
     released = await release_service.process_order_releases(
         session, order.id, reference_time=one_hour_later
     )
-    assert released == Decimal("4650.00")
+    assert released == Decimal("5000.00")
 
     released_again = await release_service.process_order_releases(
         session, order.id, reference_time=one_hour_later
@@ -78,12 +79,38 @@ async def test_hourly_release_is_idempotent_and_capped(
     )
     assert count == 1
 
+    release = await session.scalar(
+        select(HourlyRelease).where(HourlyRelease.order_id == order.id)
+    )
+    assert release is not None
+    assert release.amount == Decimal("5000.00")
+    assert release.seller_amount == Decimal("2500.00")
+    assert release.platform_amount == Decimal("2500.00")
+
     seller_balance = await session.scalar(
         select(SellerBalance).where(SellerBalance.seller_id == seller.id)
     )
     assert seller_balance is not None
-    assert seller_balance.available == Decimal("4650.00")
-    assert seller_balance.pending == Decimal("88350.00")
+    assert seller_balance.available == Decimal("2500.00")
+    assert seller_balance.pending == Decimal("95000.00")
+    assert seller_balance.total_earned == Decimal("2500.00")
+
+    platform_balance = await session.scalar(
+        select(PlatformBalance).where(PlatformBalance.id == 1)
+    )
+    assert platform_balance is not None
+    assert platform_balance.available == Decimal("2500.00")
+    assert platform_balance.total_earned == Decimal("2500.00")
+
+    platform_tx = await session.scalar(
+        select(Transaction).where(
+            Transaction.order_id == order.id,
+            Transaction.type == "platform_hourly_share",
+        )
+    )
+    assert platform_tx is not None
+    assert platform_tx.user_id is None
+    assert platform_tx.amount == Decimal("2500.00")
 
 
 async def test_completion_releases_remaining_and_marks_sold(
@@ -107,9 +134,10 @@ async def test_completion_releases_remaining_and_marks_sold(
         select(SellerBalance).where(SellerBalance.seller_id == seller.id)
     )
     assert seller_balance is not None
-    assert seller_balance.total_released == Decimal("93000.00")
+    assert seller_balance.total_released == Decimal("97500.00")
     assert seller_balance.pending == Decimal("0.00")
-    assert seller_balance.available == Decimal("93000.00")
+    assert seller_balance.available == Decimal("97500.00")
+    assert seller_balance.total_earned == Decimal("97500.00")
 
     completion_tx = await session.scalar(
         select(Transaction).where(
@@ -118,7 +146,7 @@ async def test_completion_releases_remaining_and_marks_sold(
         )
     )
     assert completion_tx is not None
-    assert completion_tx.amount == Decimal("88350.00")
+    assert completion_tx.amount == Decimal("95000.00")
 
 
 async def test_release_never_exceeds_seller_amount(session, seller, buyer, account) -> None:
@@ -131,12 +159,26 @@ async def test_release_never_exceeds_seller_amount(session, seller, buyer, accou
         session, order.id, reference_time=much_later
     )
     total = await release_service.hourly_released_total(session, order.id)
-    assert total == Decimal("93000.00")
+    assert total == Decimal("100000.00")
 
     count = await session.scalar(
         select(func.count(HourlyRelease.id)).where(HourlyRelease.order_id == order.id)
     )
     assert count == 20
+
+    platform_balance = await session.scalar(
+        select(PlatformBalance).where(PlatformBalance.id == 1)
+    )
+    assert platform_balance is not None
+    assert platform_balance.available == Decimal("50000.00")
+    assert platform_balance.total_earned == Decimal("50000.00")
+
+    seller_balance = await session.scalar(
+        select(SellerBalance).where(SellerBalance.seller_id == seller.id)
+    )
+    assert seller_balance is not None
+    assert seller_balance.pending == Decimal("0.00")
+    assert seller_balance.total_earned == Decimal("50000.00")
 
 
 async def test_editing_is_blocked_after_account_is_reserved(

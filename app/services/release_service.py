@@ -19,7 +19,8 @@ from app.models import (
     Transaction,
     TransactionType,
 )
-from app.services.user_service import get_seller_balance
+from app.services.commission_service import split_hourly_amount
+from app.services.user_service import get_platform_balance, get_seller_balance
 from app.utils import ensure_utc, now_utc
 
 logger = get_logger(__name__)
@@ -44,6 +45,21 @@ async def hourly_released_total(session: AsyncSession, order_id: int) -> Decimal
     return quantize_money(Decimal(str(value or 0)))
 
 
+async def hourly_share_totals(session: AsyncSession, order_id: int) -> tuple[Decimal, Decimal]:
+    seller_total, platform_total = (
+        await session.execute(
+            select(
+                func.coalesce(func.sum(HourlyRelease.seller_amount), 0),
+                func.coalesce(func.sum(HourlyRelease.platform_amount), 0),
+            ).where(HourlyRelease.order_id == order_id)
+        )
+    ).one()
+    return (
+        quantize_money(Decimal(str(seller_total or 0))),
+        quantize_money(Decimal(str(platform_total or 0))),
+    )
+
+
 async def released_hour_numbers(session: AsyncSession, order_id: int) -> set[int]:
     result = await session.scalars(
         select(HourlyRelease.hour_number).where(HourlyRelease.order_id == order_id)
@@ -57,7 +73,7 @@ async def process_order_releases(
     *,
     reference_time: datetime | None = None,
 ) -> Decimal:
-    """Release the configured hourly percentage of the seller share.
+    """Release the configured hourly percentage and split it 50/50.
 
     The function is idempotent: hourly_releases has a unique (order_id, hour_number)
     constraint and every transaction uses a deterministic reference.
@@ -96,6 +112,7 @@ async def process_order_releases(
         return Decimal("0")
 
     balance = await get_seller_balance(session, order.seller_id)
+    platform_balance = await get_platform_balance(session, for_update=True)
     released_now = Decimal("0")
 
     for hour_number in range(1, eligible_hours + 1):
@@ -108,29 +125,52 @@ async def process_order_releases(
         if amount <= 0:
             break
 
+        seller_share, platform_share = split_hourly_amount(amount)
         reference = f"hourly:{order.id}:{hour_number}"
+        platform_reference = f"hourly-platform:{order.id}:{hour_number}"
         session.add(
             HourlyRelease(
                 order_id=order.id,
                 hour_number=hour_number,
                 amount=amount,
+                seller_amount=seller_share,
+                platform_amount=platform_share,
                 reference=reference,
             )
         )
         balance.pending = max(Decimal("0"), quantize_money(Decimal(balance.pending) - amount))
-        balance.available = quantize_money(Decimal(balance.available) + amount)
-        balance.total_released = quantize_money(Decimal(balance.total_released) + amount)
+        balance.available = quantize_money(Decimal(balance.available) + seller_share)
+        balance.total_released = quantize_money(Decimal(balance.total_released) + seller_share)
+        balance.total_earned = quantize_money(Decimal(balance.total_earned) + seller_share)
+        platform_balance.available = quantize_money(
+            Decimal(platform_balance.available) + platform_share
+        )
+        platform_balance.total_earned = quantize_money(
+            Decimal(platform_balance.total_earned) + platform_share
+        )
         session.add(
             Transaction(
                 order_id=order.id,
                 user_id=order.seller_id,
                 type=TransactionType.HOURLY_RELEASE.value,
-                amount=amount,
+                amount=seller_share,
                 balance_after=balance.available,
                 reference=reference,
-                description=f"Hourly escrow release #{hour_number}",
+                description=f"Hourly seller share #{hour_number}",
             )
         )
+        if platform_share > 0:
+            session.add(
+                Transaction(
+                    order_id=order.id,
+                    user_id=None,
+                    type=TransactionType.PLATFORM_HOURLY_SHARE.value,
+                    amount=platform_share,
+                    balance_after=platform_balance.available,
+                    reference=platform_reference,
+                    description=f"Hourly platform owner share #{hour_number}",
+                )
+            )
         released_total = quantize_money(released_total + amount)
         released_now = quantize_money(released_now + amount)
 

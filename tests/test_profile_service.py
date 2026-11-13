@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 
 from app.models import OrderStatus, TransactionType
-from app.services import escrow_service, order_service, profile_service, review_service
+from app.services import (
+    escrow_service,
+    order_service,
+    profile_service,
+    release_service,
+    review_service,
+)
 from app.services.user_service import upsert_user
+from app.utils import ensure_utc
 
 pytestmark = pytest.mark.asyncio
 
@@ -25,8 +33,8 @@ async def test_profile_stats_before_and_after_completed_sale(
 
     await escrow_service.hold_funds(session, order.id)
     held_stats = await profile_service.get_profile_stats(session, seller)
-    assert held_stats.balance.seller_pending == Decimal("93000.00")
-    assert held_stats.balance.pending_total == Decimal("93000.00")
+    assert held_stats.balance.seller_pending == Decimal("100000.00")
+    assert held_stats.balance.pending_total == Decimal("100000.00")
 
     await escrow_service.complete_order(session, order.id, buyer.id)
     await review_service.create_review(
@@ -41,15 +49,15 @@ async def test_profile_stats_before_and_after_completed_sale(
     assert stats.sold_count == 1
     assert stats.bought_count == 0
     assert stats.sales_volume == Decimal("100000.00")
-    assert stats.commission_total == Decimal("7000.00")
-    assert stats.net_earned == Decimal("93000.00")
+    assert stats.commission_total == Decimal("0.00")
+    assert stats.net_earned == Decimal("100000.00")
     assert stats.total_trade == Decimal("100000.00")
     assert stats.active_listings == 0
     assert stats.pending_trades == 0
-    assert stats.balance.seller_available == Decimal("93000.00")
+    assert stats.balance.seller_available == Decimal("100000.00")
     assert stats.balance.seller_pending == Decimal("0")
-    assert stats.balance.seller_total_earned == Decimal("93000.00")
-    assert stats.balance.available_total == Decimal("93000.00")
+    assert stats.balance.seller_total_earned == Decimal("100000.00")
+    assert stats.balance.available_total == Decimal("100000.00")
     assert stats.rating == Decimal("5.0")
     assert stats.review_count == 1
     assert stats.registered_at is not None
@@ -61,6 +69,25 @@ async def test_profile_stats_before_and_after_completed_sale(
     assert buyer_stats.balance.buyer_total_spent == Decimal("100000.00")
     assert buyer_stats.balance.buyer_held == Decimal("0")
     assert buyer_stats.rating is None
+
+
+async def test_profile_stats_include_hourly_platform_share(
+    session, seller, buyer, account
+) -> None:
+    order = await order_service.create_order(session, buyer, account.id)
+    order = await escrow_service.hold_funds(session, order.id)
+    await session.refresh(order)
+    one_hour_later = ensure_utc(order.paid_at) + timedelta(hours=1)
+    await release_service.process_order_releases(
+        session, order.id, reference_time=one_hour_later
+    )
+    await escrow_service.complete_order(session, order.id, buyer.id)
+
+    stats = await profile_service.get_profile_stats(session, seller)
+    assert stats.commission_total == Decimal("2500.00")
+    assert stats.net_earned == Decimal("97500.00")
+    assert stats.balance.seller_available == Decimal("97500.00")
+    assert stats.balance.seller_total_earned == Decimal("97500.00")
 
 
 async def test_profile_history_and_sold_bought_lists(session, seller, buyer, account) -> None:

@@ -62,3 +62,9 @@ def test_webhook_path_cannot_shadow_health_endpoint() -> None:
 def test_empty_port_falls_back_to_default() -> None:
     settings = Settings(_env_file=None, environment="test", port="")
     assert settings.port == 8080
+
+
+def test_default_commission_rules() -> None:
+    settings = Settings(_env_file=None, environment="test")
+    assert settings.platform_commission_rate == 0
+    assert settings.hourly_release_rate == 5

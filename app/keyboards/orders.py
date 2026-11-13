@@ -32,6 +32,21 @@ def order_actions_kb(order: Order, *, for_seller: bool) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def delivery_warning_kb(order_id: int, locale: str | None = None) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=t("order.delivery_confirm", locale),
+        callback_data=f"order:deliver:confirm:{order_id}",
+    )
+    builder.button(
+        text=t("order.delivery_cancel", locale),
+        callback_data=f"order:view:{order_id}",
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def orders_root_kb(locale: str | None = None) -> InlineKeyboardMarkup:
     locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()

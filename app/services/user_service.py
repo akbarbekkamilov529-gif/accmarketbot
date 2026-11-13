@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import BuyerBalance, SellerBalance, User
+from app.models import BuyerBalance, PlatformBalance, SellerBalance, User
 
 
 async def upsert_user(
@@ -54,6 +56,24 @@ async def get_buyer_balance(session: AsyncSession, buyer_id: int, *, create: boo
     balance = await session.scalar(select(BuyerBalance).where(BuyerBalance.buyer_id == buyer_id))
     if balance is None and create:
         balance = BuyerBalance(buyer_id=buyer_id)
+        session.add(balance)
+        await session.flush()
+    return balance
+
+
+async def get_platform_balance(
+    session: AsyncSession, *, create: bool = True, for_update: bool = False
+) -> PlatformBalance | None:
+    stmt = select(PlatformBalance).where(PlatformBalance.id == 1)
+    if for_update:
+        stmt = stmt.with_for_update()
+    balance = await session.scalar(stmt)
+    if balance is None and create:
+        balance = PlatformBalance(
+            id=1,
+            available=Decimal("0"),
+            total_earned=Decimal("0"),
+        )
         session.add(balance)
         await session.flush()
     return balance

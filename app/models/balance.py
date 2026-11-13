@@ -41,3 +41,15 @@ class BuyerBalance(Base, TimestampMixin):
     total_spent: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
 
     buyer: Mapped["User"] = relationship(back_populates="buyer_balance")
+
+
+class PlatformBalance(Base, TimestampMixin):
+    __tablename__ = "platform_balances"
+
+    id: Mapped[int] = mapped_column(
+        BigIntPK, primary_key=True, autoincrement=False, default=1
+    )
+    available: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    total_earned: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), default=Decimal("0"), nullable=False
+    )

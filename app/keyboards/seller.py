@@ -87,10 +87,11 @@ def edit_menu_kb(fields: list[dict[str, str]], image_count: int) -> InlineKeyboa
     return builder.as_markup()
 
 
-def warning_kb() -> InlineKeyboardMarkup:
+def warning_kb(locale: str | None = None) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Ha, tasdiqlayman", callback_data="seller:warning:yes")
-    builder.button(text="❌ Yo'q, qaytish", callback_data="seller:warning:back")
+    builder.button(text=t("seller.warning_yes", locale), callback_data="seller:warning:yes")
+    builder.button(text=t("seller.warning_no", locale), callback_data="seller:warning:back")
     builder.adjust(1)
     return builder.as_markup()
 

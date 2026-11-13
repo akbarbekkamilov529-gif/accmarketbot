@@ -268,18 +268,6 @@ async def buyer_view_account(
     await state.update_data({"view_account_id": account.id})
 
 
-PURCHASE_WARNING = (
-    "⚠️ <b>XARID QILISHDAN OLDIN DIQQAT!</b>\n\n"
-    "Siz akkauntni sotib olishga qaror qilyapsiz.\n\n"
-    "• Xarid qilishdan oldin e'lon ma'lumotlarini tekshiring.\n"
-    "• Akkaunt boshqa odamga tegishli ekanligi aniqlansa, bu haqda xabar berish "
-    "imkoniyati bo'lsin.\n"
-    "• Xaridni tasdiqlaganingizdan keyin pulni qaytarish avtomatik kafolatlanmaydi.\n"
-    "• Nizolar bo'yicha avtomatik tizim ishlaydi.\n"
-    "• Seller akkauntni topshirish uchun javobgar."
-)
-
-
 @router.callback_query(F.data.startswith("buyer:buy:"))
 async def buyer_buy(
     callback: CallbackQuery,
@@ -300,12 +288,19 @@ async def buyer_buy(
         await callback.answer("O'z akkauntingizni sotib ololmaysiz.", show_alert=True)
         return
     await callback.answer()
+    locale = user_locale(user)
     await state.set_state(BuyerStates.purchase_warning)
     await state.update_data({"purchase_account_id": account.id})
-    await safe_edit(callback.message, PURCHASE_WARNING, purchase_warning_kb(account.id))
+    await safe_edit(
+        callback.message,
+        t("buyer.purchase_warning", locale),
+        purchase_warning_kb(account.id, locale),
+    )
 
 
-@router.callback_query(F.data.startswith("buyer:continue:"))
+@router.callback_query(
+    StateFilter(BuyerStates.purchase_warning), F.data.startswith("buyer:continue:")
+)
 async def buyer_continue(
     callback: CallbackQuery,
     state: FSMContext,
@@ -317,27 +312,30 @@ async def buyer_continue(
     except (ValueError, IndexError):
         await callback.answer("E'lon topilmadi.", show_alert=True)
         return
+    data = await state.get_data()
+    if data.get("purchase_account_id") != account_id:
+        await callback.answer("Sessiya eskirgan. E'lonni qaytadan oching.", show_alert=True)
+        return
     account = await account_service.get_account(session, account_id)
     if account is None or account.status != AccountStatus.ACTIVE.value:
         await callback.answer("Akkaunt hozir sotuvda mavjud emas.", show_alert=True)
         return
     await callback.answer()
-    text = (
-        "💳 <b>To'lov</b>\n\n"
-        f"🎮 {platform_display(account.platform)}\n"
-        f"🔤 {esc(account.nickname)}\n"
-        f"💵 {format_money(account.price, account.currency)}\n\n"
-        "To'lov tizimi hali ulanmagan.\n"
-        "Hozircha faqat <b>⏭ SKIP PAYMENT</b> (demo) mavjud.\n\n"
-        "⚠️ Demo rejimida haqiqiy buyurtma yaratilmaydi, to'lov olinmaydi va "
-        "sellerga mablag' yozilmaydi."
+    locale = user_locale(user)
+    text = t(
+        "buyer.payment_body",
+        locale,
+        platform=platform_display(account.platform),
+        nickname=esc(account.nickname),
+        price=format_money(account.price, account.currency),
     )
-    await state.set_state(BuyerStates.purchase_warning)
     await state.update_data({"purchase_account_id": account.id})
-    await safe_edit(callback.message, text, purchase_actions_kb(account.id))
+    await safe_edit(callback.message, text, purchase_actions_kb(account.id, locale))
 
 
-@router.callback_query(F.data.startswith("buyer:skip:"))
+@router.callback_query(
+    StateFilter(BuyerStates.purchase_warning), F.data.startswith("buyer:skip:")
+)
 async def buyer_skip_payment(
     callback: CallbackQuery,
     state: FSMContext,
@@ -349,24 +347,25 @@ async def buyer_skip_payment(
     except (ValueError, IndexError):
         await callback.answer("E'lon topilmadi.", show_alert=True)
         return
+    data = await state.get_data()
+    if data.get("purchase_account_id") != account_id:
+        await callback.answer("Sessiya eskirgan. E'lonni qaytadan oching.", show_alert=True)
+        return
     account = await account_service.get_account(session, account_id)
     if account is None or account.status != AccountStatus.ACTIVE.value:
         await callback.answer("Akkaunt hozir sotuvda mavjud emas.", show_alert=True)
         return
     await callback.answer()
+    locale = user_locale(user)
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ E'longa qaytish", callback_data=f"buyer:view:{account.id}")
-    builder.button(text="🏠 Bosh menyu", callback_data="menu:home")
+    builder.button(
+        text=t("buyer.back_listing", locale), callback_data=f"buyer:view:{account.id}"
+    )
+    builder.button(text=t("common.home", locale), callback_data="menu:home")
     builder.adjust(1)
     await safe_edit(
         callback.message,
-        "⏭ <b>SKIP PAYMENT — DEMO REJIM</b>\n\n"
-        "Bu demo tugma. Haqiqiy to'lov provayderi ulanmagan.\n\n"
-        "❌ Buyurtma yaratilmadi.\n"
-        "❌ To'lov amalga oshirilmadi.\n"
-        "❌ Akkaunt band qilinmadi.\n"
-        "❌ Sellerga mablag' yozilmadi.\n\n"
-        "Haqiqiy xarid uchun to'lov provayderi (Click/Payme) ulanishi kerak.",
+        f"{t('buyer.skip_title', locale)}\n\n{t('buyer.skip_body', locale)}",
         builder.as_markup(),
     )
     await state.clear()

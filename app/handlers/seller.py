@@ -696,18 +696,13 @@ async def seller_edit_add_field(callback: CallbackQuery, state: FSMContext) -> N
 
 
 @router.callback_query(StateFilter(SellerStates.preview), F.data == "seller:preview:confirm")
-async def seller_preview_confirm(callback: CallbackQuery, state: FSMContext) -> None:
+async def seller_preview_confirm(
+    callback: CallbackQuery, state: FSMContext, user: User
+) -> None:
     await callback.answer()
     await state.set_state(SellerStates.warning)
-    text = (
-        "⚠️ <b>MUHIM OGOHLANTIRISH</b>\n\n"
-        "Siz joylayotgan akkaunt o'zingizga tegishli ekanligini tasdiqlaysizmi?\n\n"
-        "Siz bu akkauntdan foydalanishni to'xtatishga va xaridordan keyin "
-        "akkauntga qayta kirmaslikka rozimisiz?\n\n"
-        "Akkauntni sotish uchun tegishli platforma qoidalariga rioya qilishingiz kerak.\n\n"
-        "Tasdiqlasangiz, akkaunt marketplace'da <b>ACTIVE</b> holatida e'lon qilinadi."
-    )
-    await safe_edit(callback.message, text, warning_kb())
+    locale = user_locale(user)
+    await safe_edit(callback.message, t("seller.warning", locale), warning_kb(locale))
 
 
 @router.callback_query(StateFilter(SellerStates.warning), F.data == "seller:warning:back")

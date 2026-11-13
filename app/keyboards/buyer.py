@@ -70,18 +70,32 @@ def buyer_account_detail_kb(account: Account) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def purchase_warning_kb(account_id: int) -> InlineKeyboardMarkup:
+def purchase_warning_kb(
+    account_id: int, locale: str | None = None
+) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Davom etish", callback_data=f"buyer:continue:{account_id}")
-    builder.button(text="❌ Bekor qilish", callback_data=f"buyer:view:{account_id}")
+    builder.button(
+        text=t("buyer.continue", locale), callback_data=f"buyer:continue:{account_id}"
+    )
+    builder.button(
+        text=t("buyer.back_listing", locale), callback_data=f"buyer:view:{account_id}"
+    )
     builder.adjust(1)
     return builder.as_markup()
 
 
-def purchase_actions_kb(account_id: int) -> InlineKeyboardMarkup:
+def purchase_actions_kb(
+    account_id: int, locale: str | None = None
+) -> InlineKeyboardMarkup:
+    locale = normalize_locale(locale)
     builder = InlineKeyboardBuilder()
-    builder.button(text="⏭ SKIP PAYMENT", callback_data=f"buyer:skip:{account_id}")
-    builder.button(text="❌ Bekor qilish", callback_data=f"buyer:view:{account_id}")
+    builder.button(
+        text=t("buyer.skip_payment", locale), callback_data=f"buyer:skip:{account_id}"
+    )
+    builder.button(
+        text=t("buyer.back_listing", locale), callback_data=f"buyer:view:{account_id}"
+    )
     builder.adjust(1)
     return builder.as_markup()
 

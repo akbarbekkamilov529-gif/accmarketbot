@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
@@ -7,14 +9,21 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.constants import format_money, platform_display
+from app.constants import format_money, platform_display, quantize_money
 from app.handlers.helpers import safe_edit
 from app.i18n import t, user_locale
 from app.keyboards.buyer import review_rating_kb
-from app.keyboards.orders import order_actions_kb, orders_root_kb
+from app.keyboards.orders import delivery_warning_kb, order_actions_kb, orders_root_kb
 from app.models import Order, OrderStatus, User
-from app.services import account_service, escrow_service, notification_service, order_service
+from app.services import (
+    account_service,
+    escrow_service,
+    notification_service,
+    order_service,
+    release_service,
+)
 from app.services.order_service import OrderError, OrderForbidden, OrderStateError
+from app.states import SellerStates
 from app.utils import esc, format_datetime, truncate
 
 router = Router(name="orders")
@@ -45,6 +54,7 @@ def order_status_label(status: str) -> str:
 
 def order_detail_text(order: Order, user: User) -> str:
     role = "Buyer" if order.buyer_id == user.id else "Seller"
+    locale = user_locale(user)
     account = order.account
     lines = [
         f"📦 <b>Buyurtma #{order.public_id}</b>",
@@ -61,8 +71,12 @@ def order_detail_text(order: Order, user: User) -> str:
         [
             "",
             f"💵 <b>Summa:</b> {format_money(order.amount, order.currency)}",
-            f"🏦 <b>Platforma komissiyasi:</b> {format_money(order.commission_amount, order.currency)}",
-            f"💰 <b>Seller ulushi:</b> {format_money(order.seller_amount, order.currency)}",
+            t(
+                "order.seller_share",
+                locale,
+                amount=format_money(order.seller_amount, order.currency),
+            ),
+            t("order.hourly_split", locale),
             "",
             f"🕐 <b>Yaratilgan:</b> {format_datetime(order.created_at)}",
         ]
@@ -171,6 +185,7 @@ async def orders_mine(
 @router.callback_query(F.data.startswith("order:view:"))
 async def order_view(
     callback: CallbackQuery,
+    state: FSMContext,
     session: AsyncSession,
     user: User,
 ) -> None:
@@ -183,6 +198,7 @@ async def order_view(
     if order is None or user.id not in (order.buyer_id, order.seller_id):
         await callback.answer("Buyurtma topilmadi.", show_alert=True)
         return
+    await state.clear()
     await callback.answer()
     await safe_edit(
         callback.message,
@@ -259,6 +275,11 @@ async def order_confirm(
     if order is None:
         await callback.answer("Buyurtma topilmadi.", show_alert=True)
         return
+    released_total = await release_service.hourly_released_total(session, order.id)
+    remaining = max(
+        Decimal("0"),
+        quantize_money(Decimal(order.seller_amount) - released_total),
+    )
     try:
         order = await escrow_service.complete_order(session, order.id, user.id)
     except OrderForbidden as exc:
@@ -267,38 +288,47 @@ async def order_confirm(
     except (OrderError, OrderStateError) as exc:
         await callback.answer(str(exc), show_alert=True)
         return
-    await callback.answer("Buyurtma yakunlandi.")
+    locale = user_locale(user)
+    await callback.answer(t("order.completed_alert", locale))
+    seller_locale = user_locale(order.seller)
     await notification_service.notify(
         session,
         bot,
         order.seller,
-        "✅ <b>Buyurtma yakunlandi!</b>\n\n"
-        f"📦 #{order.public_id}\n"
-        f"💰 Seller ulushi: {format_money(order.seller_amount, order.currency)}\n\n"
-        "Mablag' balansingizga o'tkazildi.",
+        t(
+            "order.completed_notify",
+            seller_locale,
+            public_id=order.public_id,
+            amount=format_money(remaining, order.currency),
+        ),
         notification_type="order_completed",
         payload={"order_id": order.id},
     )
     await callback.message.answer(
-        "✅ <b>Buyurtma yakunlandi!</b>\n\n"
-        "Akkaunt SOLD holatiga o'tdi.\n"
-        "Seller ulushi escrow'dan chiqarildi.\n\n"
-        "Xizmatni baholaysizmi?",
+        t("order.completed_body", locale),
         reply_markup=review_rating_kb(order.id),
     )
 
 
-@router.callback_query(F.data.startswith("order:deliver:"))
-async def order_deliver(
+@router.callback_query(F.data.startswith("order:deliver:confirm:"))
+async def order_deliver_confirm(
     callback: CallbackQuery,
+    state: FSMContext,
     session: AsyncSession,
     user: User,
     bot: Bot,
 ) -> None:
     try:
-        order_id = int(callback.data.split(":", 2)[2])
+        order_id = int(callback.data.split(":", 3)[3])
     except (ValueError, IndexError):
         await callback.answer("Buyurtma topilmadi.", show_alert=True)
+        return
+    data = await state.get_data()
+    if (
+        await state.get_state() != SellerStates.delivery_warning.state
+        or data.get("delivery_order_id") != order_id
+    ):
+        await callback.answer("Sessiya eskirgan. Buyurtmani qaytadan oching.", show_alert=True)
         return
     try:
         order = await order_service.mark_delivered(session, order_id, user.id)
@@ -308,19 +338,54 @@ async def order_deliver(
     except (OrderError, OrderStateError) as exc:
         await callback.answer(str(exc), show_alert=True)
         return
-    await callback.answer("Topshirilgan deb belgilandi.")
+    await state.clear()
+    locale = user_locale(user)
+    await callback.answer(t("order.delivered_alert", locale))
+    buyer_locale = user_locale(order.buyer)
     await notification_service.notify(
         session,
         bot,
         order.buyer,
-        "📤 <b>Seller akkauntni topshirdi!</b>\n\n"
-        f"📦 #{order.public_id}\n"
-        f"🔤 {esc(order.account.nickname)}\n\n"
-        "Akkauntni tekshirib, tasdiqlang. Muammo bo'lsa nizo oching.",
+        t(
+            "order.delivered_notify",
+            buyer_locale,
+            public_id=order.public_id,
+            nickname=esc(order.account.nickname),
+        ),
         notification_type="order_delivered",
         payload={"order_id": order.id},
     )
     await _refresh_order_view(callback, session, user, order.id)
+
+
+@router.callback_query(F.data.startswith("order:deliver:"))
+async def order_deliver(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+    user: User,
+) -> None:
+    try:
+        order_id = int(callback.data.split(":", 2)[2])
+    except (ValueError, IndexError):
+        await callback.answer("Buyurtma topilmadi.", show_alert=True)
+        return
+    order = await order_service.get_order(session, order_id)
+    if order is None or order.seller_id != user.id:
+        await callback.answer("Buyurtma topilmadi.", show_alert=True)
+        return
+    if order.status != OrderStatus.PAID.value:
+        await callback.answer("Buyurtma holati topshirish uchun mos emas.", show_alert=True)
+        return
+    await callback.answer()
+    locale = user_locale(user)
+    await state.set_state(SellerStates.delivery_warning)
+    await state.update_data({"delivery_order_id": order.id})
+    await safe_edit(
+        callback.message,
+        t("seller.delivery_warning", locale, public_id=order.public_id),
+        delivery_warning_kb(order.id, locale),
+    )
 
 
 @router.callback_query(F.data.startswith("order:cancel:"))

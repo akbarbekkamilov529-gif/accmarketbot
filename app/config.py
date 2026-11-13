@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     redis_url: str | None = None
 
     # Business rules
-    platform_commission_rate: Decimal = Field(default=Decimal("7"), ge=0, le=100)
+    platform_commission_rate: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     hourly_release_rate: Decimal = Field(default=Decimal("5"), ge=0, le=100)
     hourly_release_interval_seconds: int = Field(default=3600, ge=60)
     currency: str = "UZS"

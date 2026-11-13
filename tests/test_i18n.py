@@ -11,6 +11,8 @@ from app.i18n import (
     t,
 )
 from app.keyboards.common import language_kb, main_menu_kb
+from app.keyboards.orders import delivery_warning_kb
+from app.keyboards.seller import warning_kb
 from app.models import OrderStatus
 
 
@@ -66,3 +68,24 @@ def test_status_translation() -> None:
     assert t("status.completed", "ru") == "✅ Завершён"
     assert t("status.completed", "en") == "✅ Yakunlangan"
     assert OrderStatus.COMPLETED.value == "completed"
+
+
+def test_hourly_terms_are_shown_in_both_locales() -> None:
+    for locale in SUPPORTED_LOCALES:
+        for key in ("seller.warning", "buyer.purchase_warning", "seller.delivery_warning"):
+            text = t(key, locale)
+            assert "5%" in text
+            assert "50/50" in text
+        assert t("tx.platform_hourly_share", locale)
+
+
+def test_consent_keyboards_are_localized() -> None:
+    seller_buttons = [
+        button.text for row in warning_kb("ru").inline_keyboard for button in row
+    ]
+    assert seller_buttons == ["✅ Да, подтверждаю", "❌ Нет, вернуться"]
+
+    delivery_buttons = [
+        button.text for row in delivery_warning_kb(1, "ru").inline_keyboard for button in row
+    ]
+    assert delivery_buttons == ["✅ Да, передал", "⬅️ Отмена"]

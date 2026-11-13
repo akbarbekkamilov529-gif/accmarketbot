@@ -1,5 +1,5 @@
 from app.models.account import Account, AccountCredentials, AccountImage, AccountStatus, CredentialField
-from app.models.balance import BuyerBalance, SellerBalance
+from app.models.balance import BuyerBalance, PlatformBalance, SellerBalance
 from app.models.base import Base
 from app.models.dispute import Dispute, DisputeMessage, DisputeStatus, MessageType
 from app.models.notification import Notification
@@ -30,6 +30,7 @@ __all__ = [
     "PaymentProvider",
     "PaymentStatus",
     "PayoutHistory",
+    "PlatformBalance",
     "PayoutStatus",
     "Review",
     "SellerBalance",

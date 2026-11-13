@@ -27,6 +27,12 @@ class HourlyRelease(Base):
     )
     hour_number: Mapped[int] = mapped_column(nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    seller_amount: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), default=Decimal("0"), nullable=False
+    )
+    platform_amount: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), default=Decimal("0"), nullable=False
+    )
     reference: Mapped[str] = mapped_column(String(160), unique=True, nullable=False)
     released_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

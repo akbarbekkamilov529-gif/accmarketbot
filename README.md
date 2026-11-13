@@ -11,7 +11,7 @@ Telegram uchun to'liq avtomatlashtirilgan account marketplace boti. **Admin pane
 - E'lon yaratishdan oldin preview, tahrirlash va ogohlantirish ekrani.
 - Buyer platforma bo'yicha qidirish, filtrlash, sahifalash, akkaunt kartasi va batafsil ko'rinish.
 - Escrow: to'lovdan keyin seller ulushi `pending`ga o'tadi, buyer tasdiqlagach qolgan qismi `available` bo'ladi.
-- Har soatda seller ulushining 5% qismi avtomatik chiqariladi (maksimum 20 soat).
+- Har soatda narxning 5% qismi hisoblanadi va teng 50/50 taqsimlanadi: 50% sellerga, 50% platforma egasiga (maksimum 20 soat).
 - Buyer akkaunt ma'lumotlarini faqat to'lovdan keyin ko'radi.
 - Nizo: buyer/seller xabarlari, dalillar, escrow muzlatish, avtomatik refund yo'q.
 - Reyting va izohlar, bildirishnomalar, balance va tranzaksiyalar tarixi.
@@ -108,8 +108,8 @@ Testlar SQLite in-memory bazada ishlaydi, lokal PostgreSQL talab qilmaydi.
 | `WEBHOOK_SECRET` | Telegram webhook secret token; faqat `A-Z a-z 0-9 _ -` belgilari |
 | `HOST` / `PORT` | HTTP server manzili; Render'da `PORT` avtomatik beriladi |
 | `POLLING_FORCE` | Lokal polling mavjud webhook'ni almashtirishiga ruxsat beradi; odatda `false` |
-| `PLATFORM_COMMISSION_RATE` | Platforma komissiyasi, default `7` (%) |
-| `HOURLY_RELEASE_RATE` | Soatlik chiqarish ulushi, default `5` (%) |
+| `PLATFORM_COMMISSION_RATE` | Eski komissiya sozlamasi; default `0`, yangi oqimda ishlatilmaydi |
+| `HOURLY_RELEASE_RATE` | Har soatda hisoblanadigan ulush, default `5` (%) |
 | `PAYMENTS_ENABLED` | Haqiqiy to'lovlar yoqilganini bildiradi, default `false` |
 | `PAYMENT_PROVIDER` | `skip`, `click` yoki `payme` |
 | `SKIP_PAYMENT_ENABLED` | Demo SKIP PAYMENT tugmasini ko'rsatish |
@@ -157,12 +157,14 @@ Docker Render'da `PORT` avtomatik beriladi. Konteyner `alembic upgrade head`dan 
 
 - Narx `Decimal` va `Numeric(14,2)` bilan hisoblanadi, float ishlatilmaydi.
 - Order yaratilganda akkaunt atomik `RESERVED` bo'ladi; partial unique index bir akkauntni ikki marta sotishni bloklaydi.
-- Komissiya: `order.amount * PLATFORM_COMMISSION_RATE / 100`.
-- Seller ulushi: `order.amount - commission`.
-- Komissiya yakuniy summasi faqat muvaffaqiyatli to'lovdan keyin hisoblanadi va bitta tranzaksiya sifatida yoziladi; `orders.amount`, `orders.commission_amount`, `orders.seller_amount` alohida saqlanadi.
-- Hourly release: seller ulushining `HOURLY_RELEASE_RATE` foizi, `HOURLY_RELEASE_INTERVAL_SECONDS` oralig'ida. `(order_id, hour_number)` unique bo'lgani uchun idempotent.
-- Nizo ochilganda hourly release to'xtaydi. Nizoni avtomatik hal qilish yoki refund qilish yo'q — kelishuv yoki qo'lda aralashuv talab qilinadi.
-- Buyer tasdiqlaganda qolgan escrow qismi sellerga chiqariladi.
+- Yangi orderlarda eski komissiya olinmaydi: `commission_amount = 0`, `seller_amount = order.amount`.
+- Hourly release: har `HOURLY_RELEASE_INTERVAL_SECONDS` oralig'ida `order.seller_amount * HOURLY_RELEASE_RATE / 100` hisoblanadi.
+- Har bir soatlik summa teng 50/50 bo'linadi: 50% seller balansiga, 50% platforma egasi balansiga. `hourly_releases`da `amount`, `seller_amount`, `platform_amount` saqlanadi.
+- `(order_id, hour_number)` unique va deterministik transaction reference'lar tufayli bir soatlik summa ikki marta taqsimlanmaydi.
+- Platforma egasi ulushi `platform_balances.available` va `total_earned`da, har bir taqsimot `transactions`da `platform_hourly_share` turi bilan yoziladi.
+- Buyer tasdiqlaganda escrow'dagi qolgan summa sellerga chiqariladi; platforma egasi faqat soatlik 5%ning o'z ulushini oladi.
+- Nizo ochilganda hourly release to'xtaydi. Nizoni avtomatik hal qilish yo'q — kelishuv yoki qo'lda aralashuv talab qilinadi.
+- Refund buyer'ga to'liq summani qaytaradi; allaqachon chiqarilgan seller va platforma soatlik ulushlari ikkala balansdan ham qaytarib olinadi.
 - SKIP PAYMENT — demo: buyurtma yaratilmaydi, to'lov olinmaydi, sellerga pul yozilmaydi.
 
 ## To'lov provayderlari

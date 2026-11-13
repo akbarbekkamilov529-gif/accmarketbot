@@ -13,6 +13,7 @@ from app.models import (
     ACTIVE_ORDER_STATUSES,
     Account,
     AccountStatus,
+    HourlyRelease,
     Order,
     OrderStatus,
     Review,
@@ -125,20 +126,31 @@ async def get_profile_stats(session: AsyncSession, user: User) -> ProfileStats:
             Order.status == OrderStatus.COMPLETED.value,
         ),
     )
-    commission_total = await _scalar_money(
+    legacy_commission_total = await _scalar_money(
         session,
         select(func.sum(Order.commission_amount)).where(
             Order.seller_id == user.id,
             Order.status == OrderStatus.COMPLETED.value,
         ),
     )
-    net_earned = await _scalar_money(
+    platform_hourly_total = await _scalar_money(
+        session,
+        select(func.sum(HourlyRelease.platform_amount))
+        .join(Order, Order.id == HourlyRelease.order_id)
+        .where(
+            Order.seller_id == user.id,
+            Order.status == OrderStatus.COMPLETED.value,
+        ),
+    )
+    commission_total = _money(legacy_commission_total + platform_hourly_total)
+    seller_amount_total = await _scalar_money(
         session,
         select(func.sum(Order.seller_amount)).where(
             Order.seller_id == user.id,
             Order.status == OrderStatus.COMPLETED.value,
         ),
     )
+    net_earned = _money(seller_amount_total - platform_hourly_total)
     total_trade = await _scalar_money(
         session,
         select(func.sum(Order.amount)).where(

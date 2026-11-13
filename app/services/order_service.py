@@ -10,7 +10,6 @@ from app.config import get_settings
 from app.constants import quantize_money
 from app.models import Account, AccountStatus, Order, OrderStatus, User
 from app.services import account_service
-from app.services.commission_service import split_payment_amount
 from app.services.user_service import get_buyer_balance, get_seller_balance
 from app.utils import new_public_id, now_utc
 
@@ -68,9 +67,6 @@ async def create_order(session: AsyncSession, buyer: User, account_id: int) -> O
         raise AccountNotAvailable("Akkaunt boshqa xaridor tomonidan band qilindi.")
 
     amount = quantize_money(Decimal(account.price))
-    commission, seller_amount = split_payment_amount(
-        amount, settings.platform_commission_rate
-    )
 
     order = Order(
         public_id=new_public_id(),
@@ -78,8 +74,8 @@ async def create_order(session: AsyncSession, buyer: User, account_id: int) -> O
         buyer_id=buyer.id,
         seller_id=account.seller_id,
         amount=amount,
-        commission_amount=commission,
-        seller_amount=seller_amount,
+        commission_amount=Decimal("0.00"),
+        seller_amount=amount,
         currency=account.currency or settings.currency,
         status=OrderStatus.PENDING_PAYMENT.value,
     )

@@ -4,9 +4,20 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from app.models import DisputeStatus, Order, OrderStatus, SellerBalance
+from app.models import (
+    AccountStatus,
+    BuyerBalance,
+    DisputeStatus,
+    Order,
+    OrderStatus,
+    Payment,
+    PaymentStatus,
+    PlatformBalance,
+    SellerBalance,
+    Transaction,
+)
 from app.services import dispute_service, escrow_service, order_service, release_service
 from app.utils import ensure_utc
 
@@ -42,7 +53,7 @@ async def test_dispute_stops_and_resumes_hourly_release(
     released_after = await release_service.process_order_releases(
         session, order.id, reference_time=two_hours
     )
-    assert released_after == Decimal("9300.00")
+    assert released_after == Decimal("10000.00")
 
 
 async def test_only_participants_can_send_dispute_messages(
@@ -84,3 +95,86 @@ async def test_seller_response_changes_status(session, seller, buyer, account) -
     refreshed = await dispute_service.get_dispute(session, dispute.id)
     assert refreshed is not None
     assert refreshed.status == DisputeStatus.SELLER_RESPONDED.value
+
+
+async def test_refund_reverses_accrued_seller_and_platform_shares(
+    session, seller, buyer, account
+) -> None:
+    order = await order_service.create_order(session, buyer, account.id)
+    payment = Payment(
+        order_id=order.id,
+        provider="payme",
+        status=PaymentStatus.SUCCEEDED.value,
+        amount=order.amount,
+        currency=order.currency,
+        idempotency_key=f"refund:{order.public_id}",
+    )
+    session.add(payment)
+    order = await escrow_service.hold_funds(session, order.id)
+    two_hours = ensure_utc(order.paid_at) + timedelta(hours=2)
+    released = await release_service.process_order_releases(
+        session, order.id, reference_time=two_hours
+    )
+    assert released == Decimal("10000.00")
+
+    seller_balance = await session.scalar(
+        select(SellerBalance).where(SellerBalance.seller_id == seller.id)
+    )
+    buyer_balance = await session.scalar(
+        select(BuyerBalance).where(BuyerBalance.buyer_id == buyer.id)
+    )
+    platform_balance = await session.scalar(
+        select(PlatformBalance).where(PlatformBalance.id == 1)
+    )
+    assert seller_balance is not None
+    assert buyer_balance is not None
+    assert platform_balance is not None
+    assert seller_balance.available == Decimal("5000.00")
+    assert seller_balance.pending == Decimal("90000.00")
+    assert platform_balance.available == Decimal("5000.00")
+
+    refunded = await escrow_service.refund_order(session, order.id)
+    assert refunded.status == OrderStatus.REFUNDED.value
+    assert seller_balance.available == Decimal("0.00")
+    assert seller_balance.pending == Decimal("0.00")
+    assert seller_balance.total_released == Decimal("0.00")
+    assert seller_balance.total_earned == Decimal("0.00")
+    assert buyer_balance.held == Decimal("0.00")
+    assert platform_balance.available == Decimal("0.00")
+    assert platform_balance.total_earned == Decimal("0.00")
+    await session.refresh(payment)
+    assert payment.status == PaymentStatus.REFUNDED.value
+
+    await session.refresh(account)
+    assert account.status == AccountStatus.ACTIVE.value
+
+    refund_tx_count = await session.scalar(
+        select(func.count(Transaction.id)).where(
+            Transaction.order_id == order.id, Transaction.type == "refund"
+        )
+    )
+    seller_reversal_count = await session.scalar(
+        select(func.count(Transaction.id)).where(
+            Transaction.order_id == order.id, Transaction.type == "hourly_reversal"
+        )
+    )
+    platform_reversal_count = await session.scalar(
+        select(func.count(Transaction.id)).where(
+            Transaction.order_id == order.id,
+            Transaction.type == "platform_hourly_reversal",
+        )
+    )
+    assert refund_tx_count == 1
+    assert seller_reversal_count == 1
+    assert platform_reversal_count == 1
+
+    again = await escrow_service.refund_order(session, order.id)
+    assert again.status == OrderStatus.REFUNDED.value
+    assert (
+        await session.scalar(
+            select(func.count(Transaction.id)).where(
+                Transaction.order_id == order.id, Transaction.type == "refund"
+            )
+        )
+        == 1
+    )

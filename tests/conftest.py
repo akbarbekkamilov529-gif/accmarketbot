@@ -7,7 +7,7 @@ os.environ.setdefault("BOT_TOKEN", "123456:TESTTOKEN")
 os.environ.setdefault("CREDENTIAL_ENCRYPTION_KEY", "unit-test-passphrase")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("PLATFORM_COMMISSION_RATE", "7")
+os.environ.setdefault("PLATFORM_COMMISSION_RATE", "0")
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

@@ -122,7 +122,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "stats.sales_volume": "Sotuv hajmi",
         "stats.purchases_volume": "Xarid hajmi",
         "stats.total_trade": "Jami savdo hajmi",
-        "stats.commission": "Platforma komissiyasi",
+        "stats.commission": "Soatlik platforma ulushi",
         "stats.net_earned": "Sof daromad",
         "stats.active_listings": "Faol e'lonlar",
         "stats.pending_trades": "Kutilayotgan bitimlar",
@@ -157,8 +157,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "tx.payment": "To'lov",
         "tx.escrow_hold": "Escrowga ushlash",
         "tx.hourly_release": "Soatlik chiqarish",
+        "tx.hourly_reversal": "Soatlik ulushni qaytarish",
         "tx.completion_release": "Yakuniy chiqarish",
         "tx.platform_commission": "Platforma komissiyasi",
+        "tx.platform_hourly_share": "Soatlik platforma ulushi",
+        "tx.platform_hourly_reversal": "Platforma ulushini qaytarish",
         "tx.refund": "Qaytarish",
         "tx.payout": "Pul chiqarish",
         "tx.adjustment": "Tuzatish",
@@ -181,6 +184,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "order.account": "🔤 <b>Akkaunt:</b> {nickname}",
         "order.amount": "💵 <b>Summa:</b> {amount}",
         "order.commission": "🏦 <b>Platforma komissiyasi:</b> {amount}",
+        "order.hourly_split": (
+            "⏱ <b>Soatlik taqsimot:</b> narxning 5% qismi — "
+            "50% seller / 50% platforma egasi"
+        ),
         "order.seller_share": "💰 <b>Seller ulushi:</b> {amount}",
         "order.created": "🕐 <b>Yaratilgan:</b> {date}",
         "order.paid_at": "💳 <b>To'langan:</b> {date}",
@@ -209,9 +216,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "order.completed_notify": (
             "✅ <b>Buyurtma yakunlandi!</b>\n\n"
             "📦 #{public_id}\n"
-            "💰 Seller ulushi: {amount}\n\n"
+            "💰 Yakuniy qoldiq: {amount}\n\n"
+            "Har soatlik 5%ning 50%i sizga, 50%i platforma egasiga taqsimlangan.\n"
             "Mablag' balansingizga o'tkazildi."
         ),
+        "order.delivery_confirm": "✅ Ha, topshirdim",
+        "order.delivery_cancel": "⬅️ Bekor qilish",
         "order.delivered_alert": "Topshirilgan deb belgilandi.",
         "order.delivered_notify": (
             "📤 <b>Seller akkauntni topshirdi!</b>\n\n"
@@ -337,8 +347,22 @@ TEXTS: dict[str, dict[str, str]] = {
             "Siz joylayotgan akkaunt o'zingizga tegishli ekanligini tasdiqlaysizmi?\n\n"
             "Siz bu akkauntdan foydalanishni to'xtatishga va xaridordan keyin "
             "akkauntga qayta kirmaslikka rozimisiz?\n\n"
+            "<b>Yangi to'lov shartlari:</b>\n"
+            "• Har soatda akkaunt narxining <b>5%</b> qismi hisoblanadi.\n"
+            "• Ushbu 5% teng <b>50/50</b> bo'linadi: 50% sizga, 50% platforma egasiga.\n"
+            "• Xaridor tasdiqlagach escrow'dagi qolgan summa sizga o'tadi.\n"
+            "• Eski 7% komissiya olib tashlangan. Qo'shimcha yashirin to'lov yo'q.\n\n"
             "Akkauntni sotish uchun tegishli platforma qoidalariga rioya qilishingiz kerak.\n\n"
             "Tasdiqlasangiz, akkaunt marketplace'da <b>ACTIVE</b> holatida e'lon qilinadi."
+        ),
+        "seller.delivery_warning": (
+            "📤 <b>AKKAUNTNI TOPSHIRISHNI TASDIQLASH</b>\n\n"
+            "📦 #{public_id}\n\n"
+            "Akkauntni xaridorga topshirganingizni tasdiqlaysizmi?\n\n"
+            "Eslatma: har soatda narxning <b>5%</b> qismi hisoblanadi va teng "
+            "<b>50/50</b> taqsimlanadi: 50% sizga, 50% platforma egasiga. "
+            "Eski 7% komissiya olib tashlangan.\n\n"
+            "Topshirgandan so'ng xaridor akkauntni tekshirib tasdiqlaydi."
         ),
         "seller.already_publishing": "E'lon allaqachon joylanmoqda...",
         "seller.publish_error": "❌ E'lonni joylashda xatolik yuz berdi. Qayta urinib ko'ring.",
@@ -430,6 +454,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "buyer.purchase_warning": (
             "⚠️ <b>XARID QILISHDAN OLDIN DIQQAT!</b>\n\n"
             "Siz akkauntni sotib olishga qaror qilyapsiz.\n\n"
+            "<b>To'lov shartlari:</b>\n"
+            "• Akkaunt narxi o'zgarmaydi va qo'shimcha to'lov olinmaydi.\n"
+            "• Har soatda narxning <b>5%</b> qismi hisoblanadi va teng <b>50/50</b> "
+            "taqsimlanadi: 50% sellerga, 50% platforma egasiga.\n"
+            "• Qolgan escrow summasi bitim yakunlangach sellerga o'tadi.\n"
+            "• Eski 7% komissiya olib tashlangan.\n\n"
             "• Xarid qilishdan oldin e'lon ma'lumotlarini tekshiring.\n"
             "• Akkaunt boshqa odamga tegishli ekanligi aniqlansa, bu haqda xabar berish "
             "imkoniyati bo'lsin.\n"
@@ -692,7 +722,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "stats.sales_volume": "Объём продаж",
         "stats.purchases_volume": "Объём покупок",
         "stats.total_trade": "Общий объём сделок",
-        "stats.commission": "Комиссия платформы",
+        "stats.commission": "Почасовая доля платформы",
         "stats.net_earned": "Чистый доход",
         "stats.active_listings": "Активные объявления",
         "stats.pending_trades": "Ожидающие сделки",
@@ -727,8 +757,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "tx.payment": "Оплата",
         "tx.escrow_hold": "Резерв в escrow",
         "tx.hourly_release": "Почасовое начисление",
+        "tx.hourly_reversal": "Возврат почасовой доли",
         "tx.completion_release": "Финальное начисление",
         "tx.platform_commission": "Комиссия платформы",
+        "tx.platform_hourly_share": "Почасовая доля платформы",
+        "tx.platform_hourly_reversal": "Возврат доли платформы",
         "tx.refund": "Возврат",
         "tx.payout": "Вывод средств",
         "tx.adjustment": "Корректировка",
@@ -751,6 +784,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "order.account": "🔤 <b>Аккаунт:</b> {nickname}",
         "order.amount": "💵 <b>Сумма:</b> {amount}",
         "order.commission": "🏦 <b>Комиссия платформы:</b> {amount}",
+        "order.hourly_split": (
+            "⏱ <b>Почасовое распределение:</b> 5% от цены — "
+            "50% продавцу / 50% владельцу платформы"
+        ),
         "order.seller_share": "💰 <b>Доля продавца:</b> {amount}",
         "order.created": "🕐 <b>Создан:</b> {date}",
         "order.paid_at": "💳 <b>Оплачен:</b> {date}",
@@ -779,9 +816,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "order.completed_notify": (
             "✅ <b>Заказ завершён!</b>\n\n"
             "📦 #{public_id}\n"
-            "💰 Доля продавца: {amount}\n\n"
+            "💰 Итоговый остаток: {amount}\n\n"
+            "Каждый час 5% распределяются 50/50: 50% вам, 50% владельцу платформы.\n"
             "Средства переведены на ваш баланс."
         ),
+        "order.delivery_confirm": "✅ Да, передал",
+        "order.delivery_cancel": "⬅️ Отмена",
         "order.delivered_alert": "Отмечено как переданное.",
         "order.delivered_notify": (
             "📤 <b>Продавец передал аккаунт!</b>\n\n"
@@ -907,8 +947,22 @@ TEXTS: dict[str, dict[str, str]] = {
             "Подтверждаете, что публикуемый аккаунт принадлежит вам?\n\n"
             "Согласны прекратить использование этого аккаунта и не входить в него "
             "после покупки?\n\n"
+            "<b>Новые условия выплат:</b>\n"
+            "• Каждый час рассчитывается <b>5%</b> от цены аккаунта.\n"
+            "• Эти 5% делятся поровну <b>50/50</b>: 50% вам, 50% владельцу платформы.\n"
+            "• После подтверждения покупателем остаток escrow переходит вам.\n"
+            "• Старая комиссия 7% отменена. Скрытых доплат нет.\n\n"
             "Для продажи аккаунта необходимо соблюдать правила соответствующей платформы.\n\n"
             "После подтверждения аккаунт будет опубликован на маркетплейсе в статусе <b>ACTIVE</b>."
+        ),
+        "seller.delivery_warning": (
+            "📤 <b>ПОДТВЕРЖДЕНИЕ ПЕРЕДАЧИ АККАУНТА</b>\n\n"
+            "📦 #{public_id}\n\n"
+            "Подтверждаете, что передали аккаунт покупателю?\n\n"
+            "Напоминание: каждый час <b>5%</b> от цены распределяются поровну "
+            "<b>50/50</b>: 50% вам, 50% владельцу платформы. "
+            "Старая комиссия 7% отменена.\n\n"
+            "После передачи покупатель проверит и подтвердит аккаунт."
         ),
         "seller.already_publishing": "Объявление уже публикуется...",
         "seller.publish_error": "❌ Ошибка при публикации объявления. Попробуйте снова.",
@@ -1000,6 +1054,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "buyer.purchase_warning": (
             "⚠️ <b>ВНИМАНИЕ ПЕРЕД ПОКУПКОЙ!</b>\n\n"
             "Вы собираетесь купить аккаунт.\n\n"
+            "<b>Условия оплаты:</b>\n"
+            "• Цена аккаунта не меняется, дополнительная плата не взимается.\n"
+            "• Каждый час рассчитывается <b>5%</b> от цены и делится поровну "
+            "<b>50/50</b>: 50% продавцу, 50% владельцу платформы.\n"
+            "• Остаток escrow переходит продавцу после завершения сделки.\n"
+            "• Старая комиссия 7% отменена.\n\n"
             "• Проверьте информацию в объявлении перед покупкой.\n"
             "• Если выяснится, что аккаунт принадлежит другому человеку, сообщите об этом.\n"
             "• После подтверждения покупки возврат средств не гарантируется автоматически.\n"
@@ -1186,8 +1246,11 @@ TRANSACTION_KEYS: dict[str, str] = {
     TransactionType.PAYMENT.value: "tx.payment",
     TransactionType.ESCROW_HOLD.value: "tx.escrow_hold",
     TransactionType.HOURLY_RELEASE.value: "tx.hourly_release",
+    TransactionType.HOURLY_REVERSAL.value: "tx.hourly_reversal",
     TransactionType.COMPLETION_RELEASE.value: "tx.completion_release",
     TransactionType.PLATFORM_COMMISSION.value: "tx.platform_commission",
+    TransactionType.PLATFORM_HOURLY_SHARE.value: "tx.platform_hourly_share",
+    TransactionType.PLATFORM_HOURLY_REVERSAL.value: "tx.platform_hourly_reversal",
     TransactionType.REFUND.value: "tx.refund",
     TransactionType.PAYOUT.value: "tx.payout",
     TransactionType.ADJUSTMENT.value: "tx.adjustment",

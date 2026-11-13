@@ -17,6 +17,7 @@ class SellerStates(StatesGroup):
     edit_menu = State()
     edit_value = State()
     warning = State()
+    delivery_warning = State()
     my_accounts = State()
     account_edit_menu = State()
     account_edit_value = State()
